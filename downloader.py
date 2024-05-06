@@ -1,4 +1,4 @@
-""" download segmented mpeg video (.ts files) from streaming websites """
+""" Download all .ts file parts from a m3u8 file, given a url."""
 import sys
 import os
 import requests
