@@ -1,0 +1,35 @@
+Metadata-Version: 2.1
+Name: m3u8-achiver
+Version: 1.0.0
+Summary: Download m3u8 files as-is
+Author-email: Benedict Chen <benedict@benedictchen.com>
+Project-URL: Homepage, https://github.com/benedictchen/m3u8-downloader-py
+Keywords: hls,m3u8,video
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE.md
+Requires-Dist: requests==2.31.0
+Provides-Extra: dev
+Requires-Dist: black; extra == "dev"
+Requires-Dist: bumpver; extra == "dev"
+Requires-Dist: isort; extra == "dev"
+Requires-Dist: pip-tools; extra == "dev"
+Requires-Dist: pytest; extra == "dev"
+
+M3U8 Python Archiver
+====================
+Given an m3u8 URL, will download ALL variable bitrate m3u8 children and all associated
+`.ts` files, any encryption keys.
+
+This is open, MIT licensed.  Please feel free to use.
+
+Usage:
+------
+
+```
+pip3 install -r requirements.txt 
+python3 download.py <M3U8_URL>
+```

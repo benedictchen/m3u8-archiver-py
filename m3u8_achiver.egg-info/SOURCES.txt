@@ -1,0 +1,9 @@
+LICENSE.md
+README.md
+pyproject.toml
+m3u8_achiver.egg-info/PKG-INFO
+m3u8_achiver.egg-info/SOURCES.txt
+m3u8_achiver.egg-info/dependency_links.txt
+m3u8_achiver.egg-info/entry_points.txt
+m3u8_achiver.egg-info/requires.txt
+m3u8_achiver.egg-info/top_level.txt

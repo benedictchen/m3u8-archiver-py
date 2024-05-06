@@ -1,0 +1,2 @@
+[console_scripts]
+realpython = downloader.__main__:main
