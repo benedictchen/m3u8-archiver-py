@@ -1,3 +1,4 @@
+./start.sh
 python -m build
 pip-compile pyproject.toml
 pip-sync

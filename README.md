@@ -9,6 +9,12 @@ Usage:
 ------
 
 ```
-pip3 install -r requirements.txt 
+pip3 install -r requirements.txt
 python3 download.py <M3U8_URL>
 ```
+
+
+Contributing
+------------
+- Publishing
+  - https://packaging.python.org/en/latest/tutorials/packaging-projects/
