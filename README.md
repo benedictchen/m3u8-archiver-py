@@ -18,3 +18,4 @@ Contributing
 ------------
 - Publishing
   - https://packaging.python.org/en/latest/tutorials/packaging-projects/
+  - https://realpython.com/pypi-publish-python-package/
