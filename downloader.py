@@ -3,6 +3,8 @@ import sys
 import os
 import requests
 import re
+from google.cloud import storage
+
 
 OUTPUT_FOLDER = 'output'
 
@@ -108,6 +110,14 @@ def extractKeyUrls(m3):
     if match:
       urls.append(match.group(1))
   return urls
+
+def uploadToGCS(bucket_name, folder_name, file_name):
+    """ upload a file to a google cloud storage bucket """
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket(bucket_name)
+    blob = bucket.blob(folder_name + '/' + file_name)
+    blob.upload_from_filename(file_name)
+    print('File {} uploaded to {}'.format(file_name, folder_name))
 
 if __name__ == "__main__":
     all_m3u8 = downloadM3u8(sys.argv[1], headers=HEADERS)
