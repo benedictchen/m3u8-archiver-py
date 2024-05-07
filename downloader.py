@@ -5,8 +5,8 @@ import os
 import requests
 import re
 import argparse
-from google.cloud import storage
 from google.oauth2 import service_account
+from google.cloud.storage import Client, transfer_manager
 
 
 OUTPUT_FOLDER = 'output'
@@ -32,13 +32,13 @@ def downloadM3u8(m3u8url,
     """ recursively download m3u8 files"""
     storage_client = None
     if gcp_bucket is not None:
-        storage_client = storage.Client(project=gcp_project,)
+        storage_client = Client(project=gcp_project,)
 
     if not os.path.isdir(OUTPUT_FOLDER):
         os.mkdir(OUTPUT_FOLDER)
     base_url = '/'.join(m3u8url.split('/')[0:-1]) + '/' # get the base url
     print('processing: {}'.format(m3u8url))
-    m3u8 = requests.get(m3u8url, headers=HEADERS) # get the m3u8 file
+    m3u8_payload = requests.get(m3u8url, headers=HEADERS) # get the m3u8 file
     folder = m3u8url.split('/')[-2] # get the filename
     parent_folder = None
     if depth > 0:
@@ -55,7 +55,7 @@ def downloadM3u8(m3u8url,
         os.mkdir(local_path)
     with open(local_target_path, 'wb') as f:
         print('writing file to {}'.format(local_target_path))
-        f.write(m3u8.content)
+        f.write(m3u8_payload.content)
 
     if gcp_bucket is not None:
         gcs_src = os.path.join(local_path, m3u8_filename)
@@ -67,8 +67,7 @@ def downloadM3u8(m3u8url,
                     gcs_target)
 
     # Download encrypted key files
-    key_urls = extractKeyUrls(m3u8)
-    # print('key_urls', key_urls)
+    key_urls = extractKeyUrls(m3u8_payload)
     keys_to_upload = []
 
     for key_url in key_urls:
@@ -87,15 +86,16 @@ def downloadM3u8(m3u8url,
                         getCleanPath(OUTPUT_FOLDER, key_to_upload),
                         getCleanPath(gcp_folder, key_to_upload))
 
-    ts_urls = extractTsUrls(m3u8) # get all the .ts urls
-    # print('ts_urls', ts_urls)
-    # list the .ts files if they exist in the dir
-    # list contents of the directory
+    ts_urls = extractTsUrls(m3u8_payload) # get all the .ts urls from m3u8 file.
+
+    # find all the .ts files in the local directory so we can exclude them.
     ts_files = set(filter(lambda x: '.ts' in x, os.listdir(local_path)[0:-1]))
 
-    # print('all ts files existing: {}'.format(ts_files))
+    print('Found existing ts files: {} total'.format(len(ts_files)))
     if len(ts_files) > 0:
         ts_urls = list(filter(lambda x: x.split('?')[0] not in ts_files, ts_urls))
+
+    # Download the files locally.
     for ts in ts_urls:
         ts_url = base_url + ts
         print('downloading: {}'.format(ts_url))
@@ -103,13 +103,20 @@ def downloadM3u8(m3u8url,
         ts_file = requests.get(ts_url, headers=HEADERS)
         with open(os.path.join(local_path, ts_filename), 'wb') as f:
             f.write(ts_file.content)
-        if gcp_bucket is not None:
+
+    # Upload everything to GCP.
+    if gcp_bucket is not None:
+        # list all ts files again.
+        ts_files_done = set(filter(lambda x: '.ts' in x, os.listdir(local_path)))
+        # print('ts_files_done', ts_files_done)
+        for ts_file in ts_files_done:
+            ts_filename = ts_file.split('/')[-1].split('?')[0]
             uploadToGCS(storage_client,
                         gcp_bucket,
-                        os.path.join(local_path, ts_filename),
+                        getCleanPath(local_path, ts_file),
                         os.path.join(gcp_path, ts_filename))
 
-    child_urls = extractM3u8Urls(m3u8) # get all the urls in the m3u8 file
+    child_urls = extractM3u8Urls(m3u8_payload) # get all the urls in the m3u8 file
     all_urls = []
     for child in child_urls:
         new_url = base_url + child
@@ -125,7 +132,6 @@ def downloadM3u8(m3u8url,
 def getCleanPath(*args):
     result = list(filter(lambda x : x is not None,
                                     list(args)))
-    print('>>>>>>>             ', result)
     return os.path.join(*result)
 
 def extractTsUrls(m3):
@@ -165,6 +171,24 @@ def uploadToGCS(storage_client, bucket_name,
     blob.upload_from_filename(source)
     print('[UPLOAD] -> File {} uploaded to {}'.format(source, destination))
 
+def bulkUploadToGcs(storage_client,
+                    bucket_name,
+                    src_dir,
+                    files,
+                    max_workers=8):
+    """ upload a list of files to a google cloud storage bucket """
+    bucket = storage_client.bucket(bucket_name)
+    results = transfer_manager.upload_many_from_filenames(
+        bucket, files, source_directory=src_dir, max_workers=max_workers
+    )
+    for name, result in zip(files, results):
+        # The results list is either `None` or an exception for each filename in
+        # the input list, in order.
+        if isinstance(result, Exception):
+            print("Failed to upload {} due to exception: {}".format(name, result))
+        else:
+            print("Uploaded {} to {}.".format(name, bucket.name))
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--gcp_bucket', help='Google Cloud Storage bucket name')
@@ -185,11 +209,7 @@ if __name__ == "__main__":
         assert args.gcp_creds_json is not None, 'GCP creds json must be provided'
         assert args.gcp_folder is not None, 'GCP folder must be provided'
 
-        # with open(args.gcp_creds_json) as source:
-        #     info = json.load(source)
-        #     print(info)
-        #     gcp_credentials = service_account.Credentials.from_service_account_info(info)
-
+    # FIXME(benedictchen): Is there a better way to pass credentials to GCP client?
     os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = args.gcp_creds_json
 
     all_m3u8 = downloadM3u8(args.m3u8_url[0], headers=HEADERS,
