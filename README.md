@@ -1,8 +1,7 @@
 M3U8 Python Archiver
 ====================
 
-- Homepage
-  - (https://github.com/benedictchen/m3u8-archiver-py)[Github]
+- Homepage: [Github](https://github.com/benedictchen/m3u8-archiver-py)
 
 Given an m3u8 URL, will download ALL variable bitrate m3u8 children and all associated
 `.ts` files, any encryption keys.
