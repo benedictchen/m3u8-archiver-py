@@ -7,8 +7,11 @@ import re
 import argparse
 from google.oauth2 import service_account
 from google.cloud.storage import Client, transfer_manager
+import multiprocessing
+from functools import partial
 
 
+MAX_WORKERS = 10
 OUTPUT_FOLDER = 'output'
 
 HEADERS = {
@@ -108,13 +111,19 @@ def downloadM3u8(m3u8url,
     if gcp_bucket is not None:
         # list all ts files again.
         ts_files_done = set(filter(lambda x: '.ts' in x, os.listdir(local_path)))
-        # print('ts_files_done', ts_files_done)
+        ts_files_to_upload = []
         for ts_file in ts_files_done:
             ts_filename = ts_file.split('/')[-1].split('?')[0]
-            uploadToGCS(storage_client,
-                        gcp_bucket,
-                        getCleanPath(local_path, ts_file),
-                        os.path.join(gcp_path, ts_filename))
+            ts_file_src = getCleanPath(local_path, ts_file)
+            ts_file_dest = os.path.join(gcp_path, ts_filename)
+            ts_files_to_upload.append((ts_file_src, ts_file_dest))
+            # uploadToGCS(storage_client,
+            #             gcp_bucket,
+            #             getCleanPath(local_path, ts_file),
+            #             os.path.join(gcp_path, ts_filename))
+        print('ts_files_to_upload', ts_files_to_upload)
+        bulkUploadToGcs(storage_client, gcp_bucket, ts_files_to_upload)
+
 
     child_urls = extractM3u8Urls(m3u8_payload) # get all the urls in the m3u8 file
     all_urls = []
@@ -171,23 +180,18 @@ def uploadToGCS(storage_client, bucket_name,
     blob.upload_from_filename(source)
     print('[UPLOAD] -> File {} uploaded to {}'.format(source, destination))
 
+def gcsUploadWorker(storage_client, bucket_name):
+    return partial(uploadToGCS, storage_client, bucket_name)
+
 def bulkUploadToGcs(storage_client,
                     bucket_name,
-                    src_dir,
-                    files,
-                    max_workers=8):
-    """ upload a list of files to a google cloud storage bucket """
-    bucket = storage_client.bucket(bucket_name)
-    results = transfer_manager.upload_many_from_filenames(
-        bucket, files, source_directory=src_dir, max_workers=max_workers
-    )
-    for name, result in zip(files, results):
-        # The results list is either `None` or an exception for each filename in
-        # the input list, in order.
-        if isinstance(result, Exception):
-            print("Failed to upload {} due to exception: {}".format(name, result))
-        else:
-            print("Uploaded {} to {}.".format(name, bucket.name))
+                    files_to_upload):
+    """ Upload a list of files to GCS """
+    p = multiprocessing.Pool(MAX_WORKERS)
+    worker = gcsUploadWorker(storage_client, bucket_name)
+    p.map(worker, files_to_upload)
+    print('Upload Pool:', p)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
