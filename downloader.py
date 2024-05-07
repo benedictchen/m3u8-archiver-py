@@ -170,7 +170,6 @@ def extractKeyUrls(m3):
 def uploadToGCS(storage_client, bucket_name,
                 source, destination):
     """ upload a file to a google cloud storage bucket """
-    print('attempting upload from {} to {}'.format(source, destination))
     bucket = storage_client.get_bucket(bucket_name)
     blob = bucket.blob(destination)
     blob.upload_from_filename(source)
